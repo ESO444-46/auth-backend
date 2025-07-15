@@ -4,13 +4,25 @@ Thanks for checking out my project.
 
 **Version:** MVP
 
-This repository demonstrates how to implement an industry-level authentication backend in Node.js, with a focus on security and maintainability.  
-I’m continuously refactoring and improving the code to follow best practices.
+This project is a Node.js authentication backend built for security and clean code practices.
 
-**Key features (implemented/planned):**
+---
+
+## Features
+
 - JWT authentication
-- Refresh token management
-- Multi-factor authentication (MFA)
-- Session management
-- Security-focused practices
+- Input validation with Zod
+- Secure password hashing (bcrypt)
+- Modular code structure
+- Advance features coming soon..
 
+---
+
+## Setup
+
+1. Clone the repo
+2. Run `npm install`
+3. Create a `.env` file with:
+4. Fill the .env values and start the server
+
+More features and docs coming soon.
