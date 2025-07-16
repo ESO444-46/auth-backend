@@ -10,12 +10,13 @@ This project is a Node.js authentication backend built for security and clean co
 
 ## Features
 
-- JWT authentication
+- JWT authentication (access & refresh tokens)
+- Logout and token invalidation
+- Secure password hashing with bcrypt
+- Well-documented endpoints
 - Input validation with Zod
-- Secure password hashing (bcrypt)
 - Modular code structure
-- Advance features coming soon..
-
+- Advanced features coming soon…
 ---
 
 ## Setup
