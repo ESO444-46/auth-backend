@@ -1,8 +1,16 @@
-const User = require("../models/userModel");
-const { loginSchema, registerSchema } = require("../schemas/authSchema");
+const uuid = require("uuid");
 const bcrypt = require("bcryptjs");
-const sendError = require("../utils/sendError");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+
+const User = require("../models/userModel");
+const sendError = require("../utils/sendError");
+const { loginSchema, registerSchema } = require("../schemas/authSchema");
+const RefreshToken = require("../models/refreshTokenModel");
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
 
 const register = async (req, res) => {
   const result = registerSchema.safeParse(req.body);
@@ -58,12 +66,35 @@ const login = async (req, res) => {
       email: user.email,
       role: "Student",
     };
-    const token = jwt.sign(payload, process.env.JSON_WEBTOKEN_SECRET);
-    return res.json({
-      success: true,
-      message: "Logged in",
-      token,
+    const accessToken = jwt.sign(payload, process.env.JSON_WEBTOKEN_SECRET, {
+      expiresIn: "1m",
     });
+
+    const refreshTokenString = uuid.v4();
+    const hashedToken = hashToken(refreshTokenString);
+    const expiryDate = 14 * 24 * 60 * 60 * 1000;
+    const newRefreshToken = RefreshToken({
+      userId: user._id,
+      token: hashedToken,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + expiryDate),
+      revoked: false,
+    });
+
+    await newRefreshToken.save();
+
+    return res
+      .cookie("refreshToken", hashedToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        expires: new Date(Date.now() + expiryDate),
+      })
+      .json({
+        success: true,
+        message: "Logged in",
+        accessToken,
+      });
   } catch (err) {
     return sendError(res, 500, "Internal server error.", err);
   }
@@ -95,4 +126,96 @@ const me = async (req, res) => {
   }
 };
 
-module.exports = { login, register, me };
+// DRY VIOLATED
+const refresh = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      return sendError(res, 401, "Unauthorized. Please login");
+    }
+
+    const verifiedToken = await RefreshToken.findOne({ token: refreshToken });
+
+    if (
+      !verifiedToken ||
+      verifiedToken.revoked ||
+      verifiedToken.expiresAt <= new Date()
+    ) {
+      return sendError(res, 401, "Invalid refresh token");
+    }
+
+    // 4. Revoke the old token
+    verifiedToken.revoked = true;
+    await verifiedToken.save();
+
+    const user = await User.findById(verifiedToken.userId);
+    if (!user) {
+      return sendError(res, 401, "User not found");
+    }
+
+    const payload = {
+      userId: user._id,
+      email: user.email,
+      role: "Student",
+    };
+
+    const accessToken = jwt.sign(payload, process.env.JSON_WEBTOKEN_SECRET, {
+      expiresIn: "1m",
+    });
+
+    const newRefreshTokenString = uuid.v4();
+    const hashedToken = hashToken(newRefreshTokenString);
+    const expiryDate = 14 * 24 * 60 * 60 * 1000;
+
+    const newRefreshToken = new RefreshToken({
+      userId: user._id,
+      token: hashedToken,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + expiryDate),
+      revoked: false,
+    });
+
+    await newRefreshToken.save();
+
+    return res
+      .cookie("refreshToken", hashedToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        expires: new Date(Date.now() + expiryDate),
+      })
+      .json({
+        success: true,
+        message: "Token refreshed",
+        accessToken,
+      });
+  } catch (err) {
+    return sendError(res, 500, "Internal server error.", err);
+  }
+};
+
+const logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.cookies;
+
+    if (refreshToken) {
+      await RefreshToken.findOneAndUpdate(
+        { token: refreshToken },
+        { revoked: true }
+      );
+    }
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+    });
+
+    return res.json({ success: true, message: "Logged out" });
+  } catch (err) {
+    return sendError(res, 500, "Internal server error.", err);
+  }
+};
+
+module.exports = { login, register, me, refresh, logout };
