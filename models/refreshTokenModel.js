@@ -1,11 +1,9 @@
-const mongoose = require("mongoose");
-const { boolean } = require("zod");
-const { required } = require("zod/mini");
+const mongoose = require('mongoose');
 
 const refreshTokenSchema = new mongoose.Schema({
   userId: {
     type: String,
-    ref: "User",
+    ref: 'User',
     required: true,
   },
   token: {
@@ -21,10 +19,10 @@ const refreshTokenSchema = new mongoose.Schema({
     required: true,
   },
   revoked: {
-    type: boolean,
+    type: Boolean,
     required: true,
   },
 });
 
-const RefreshToken = mongoose.model("RefreshToken", refreshTokenSchema);
+const RefreshToken = mongoose.model('RefreshToken', refreshTokenSchema);
 module.exports = RefreshToken;
